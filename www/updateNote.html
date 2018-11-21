@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" type="text/css" href="css/w3.css">
+    <link rel="stylesheet" type="text/css" href="css/addNote.css" />
+	<script type="text/javascript"  src="js/phonegap-1.2.0.js"></script>
+	<script type="text/javascript"  src="js/tesseract.js"></script>
+    <title>Safe Lock</title>
+	<script type="text/javascript">
+	
+		var lastId=0;
+		var url_string = window.location.href;
+		var url = new URL(url_string);
+		var keyID = url.searchParams.get("ID");
+		function loadMainScreen()
+		{
+			document.getElementById("keyVal").disabled = true;
+		    document.getElementById("title").disabled = true;
+			var db = window.openDatabase("ELOCK", "1.0", "elocker", 500000);
+			db.transaction(fetchKeys, errorCB);	
+		}
+		
+		function fetchKeys(tx)
+		{
+			tx.executeSql('SELECT * FROM ENOTES ORDER BY ID DESC', [], renderTableData, nodataError);
+		}
+		
+		function nodataError(err)
+		{
+			console.log("Error");
+		}
+
+		function renderTableData(tx, results) 
+		{
+			var len = results.rows.length;
+			if(len > 0)
+				lastId = parseInt(results.rows.item(0).ID,10)+1;
+		}
+	
+	function addNote()
+	{	
+		var keyVal = document.getElementById("keyVal").value;
+		var title = document.getElementById("title").value;
+		
+		if(keyVal != "" && title != "")
+		{
+			var db = window.openDatabase("ELOCK", "1.0", "elocker", 500000);
+			db.transaction(deleteKey, errorCB);
+			db.transaction(insertData, errorCB);
+		}
+		else
+		{
+			if(keyVal == "")
+			{
+				document.getElementById("keyVal").focus();
+			}
+			else
+			{
+				document.getElementById("title").focus();
+			}
+		}
+	}
+	
+	function deleteKey(tx)
+	{
+		tx.executeSql('DELETE FROM ENOTES WHERE ID = "'+keyID+'"');
+	}
+	
+	function insertData(tx)
+	{
+		var keyVal = document.getElementById("keyVal").value;
+		var title = document.getElementById("title").value;
+		var category = document.getElementById("category").value;
+		tx.executeSql('CREATE TABLE IF NOT EXISTS ENOTES (ID,TITLE,NOTE,CTIME,CATEGORY)');
+		var date = new Date();
+		var dateStr = String(date);
+		tx.executeSql('INSERT INTO ENOTES (ID,TITLE,NOTE,CTIME,CATEGORY) VALUES ("'+lastId+'","'+title+'", "'+keyVal+'", "'+dateStr+'","'+category+'")');
+		document.getElementById("keyVal").value="";
+		cancel();
+	}
+	
+	function cancel()
+	{
+		window.open('displayNote.html','_self');
+	}
+	
+	function errorCB(err) 
+	{
+		alert("Error processing SQL..! Error Code : "+err.code);
+		window.open('login.html','_self');
+	}
+	
+	function fetchKeyNote()
+	{
+		var db = window.openDatabase("ELOCK", "1.0", "elocker", 500000);
+			db.transaction(getNote, errorCB);	
+	}
+	
+	function getNote(tx)
+	{
+		tx.executeSql('SELECT * FROM ENOTES WHERE ID="'+keyID+'"', [], renderNote, nodataError);
+	}
+	
+	function renderNote(tx,results)
+	{
+		document.getElementById("keyVal").value = results.rows.item(0).NOTE;
+		document.getElementById("title").value = results.rows.item(0).TITLE;
+		document.getElementById("category").value = results.rows.item(0).CATEGORY;
+		categoryChanged();
+	}
+	
+	function deleteNote()
+	{
+		var db = window.openDatabase("ELOCK", "1.0", "elocker", 500000);
+		db.transaction(deleteKey, errorCB);
+		cancel();
+	}
+	
+	function ocrNote()
+	{
+		var imgs = document.getElementById("myFile").files[0];
+		Tesseract.recognize(imgs)
+			.then(function(result){
+					console.log(result)
+					document.getElementById("keyVal").value = result.text;
+			})
+	}
+	
+	function displayEdit()
+	{
+		document.getElementById("keyVal").disabled = false;
+		document.getElementById("title").disabled = false;
+		document.getElementById("category").disabled = false;
+		
+		document.getElementById("update").style.display = "inline";
+		document.getElementById("edit").style.display = "none";
+	}
+	
+	function categoryChanged()
+	{
+		var category = document.getElementById("category").value;
+		if(category == "Notes")
+		{
+			document.getElementById("file").style.display = "inline";
+			document.getElementById("lock").style.display = "none";
+		}
+		else
+		{
+			document.getElementById("file").style.display = "none";
+			document.getElementById("lock").style.display = "inline";
+		}
+	}
+	</script>
+	
+	<style> 
+		input[type=text]:disabled 
+		{
+			background: #ffffff;
+			color:black;
+		}
+
+		textarea[type=text]:disabled 
+		{
+			background: #ffffff;
+			color:black;
+		}
+	</style>
+</head>
+
+<body style="background-color: #fff;">
+	<div class="container">
+		<div align="center" class="login-header" style="position: fixed;top: 0;margin-top:0px;width: 100%;z-index:999;background-color: #fff;">
+			<div style="margin-top:10px" align="center">
+				<div style="float:left;" align= "center">
+					<img src="img/back.png" onclick="cancel();" style="float:right;width:30px;height:30px;repeat:none;outline:none;margin-left:10px">
+				</div>
+				<div style="float:right;" align= "center">
+					<input name="myFile" id="myFile" type="file" onchange="ocrNote()" class="inputfile"/>
+					<label for="myFile" style=""><img src="img/camera.png" style="width:30px;height:30px;repeat:none;outline:none;"></label>
+					&nbsp;&nbsp;
+					<img src="img/delete.png" onclick="deleteNote();" style="width:28px;height:28px;repeat:none;outline:none;">
+					&nbsp;&nbsp;
+					<img src="img/done.png" id="update" onclick="addNote();" style="width:28px;height:28px;repeat:none;outline:none;margin-right:10px;display:none;">
+					<img src="img/edit.png" id="edit" onclick="displayEdit();" style="width:26px;height:26px;repeat:none;outline:none;margin-right:10px">
+					
+				</div>
+			</div>
+			<br>
+			<br>
+			<div align="left" style="margin-left:5%">
+				<input type="text"  id="title" name="title" placeholder="Note Title"  style="border:none;outline:none;width:100%;height:25px"/>
+			</div>
+			<br>
+			<div align="left" style="margin-left:5%">
+				<img src="img/folder.png" id="file" style="width:20px;height:20px;repeat:none;outline:none;">
+				<img src="img/lock.png" id="lock" style="width:19px;height:17px;repeat:none;outline:none;display:none">
+				<select style="font-size:12px;border:none;outline:none;font-weight:bold" id="category" onchange="categoryChanged()" disabled>
+					<option value="Notes" selected>Notes</option>
+					<option value="Password">Password</option>
+				</select>
+				<hr style="width:92%;margin-top:5px">
+			</div>
+
+			
+			<div align="left" style="margin-left:5%">
+			<textarea type="text" id="keyVal" placeholder="What's on your mind? " style="border:none;outline:none;width:100%;height:300px;"></textarea>
+			</div>
+		</div>
+	</div>
+	<script>
+		loadMainScreen();
+		fetchKeyNote();
+	</script>
+</body>

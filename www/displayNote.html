@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" type="text/css" href="css/w3.css">
+    <link rel="stylesheet" type="text/css" href="css/login.css" />
+	<script type="text/javascript"  src="js/phonegap-1.2.0.js"></script>
+	<script type="text/javascript" charset="utf-8" src="js/cordova-1.5.0.js"></script>
+    <title>Safe Lock</title>
+	<script type="text/javascript">
+		if(!localStorage.getItem("userLoggedIn") == true)
+		{
+			 window.location = "login.html";
+		}
+		
+		function loadMainScreen()
+		{
+			document.getElementById("tableData").innerHTML = "";
+			var db = window.openDatabase("ELOCK", "1.0", "elocker", 500000);
+			db.transaction(fetchKeys, errorCB);	
+		}
+		
+		function fetchKeys(tx)
+		{
+			tx.executeSql('SELECT * FROM ENOTES ORDER BY ID DESC', [], renderTableData, nodataError);
+		}
+		
+		function nodataError(err)
+		{
+			console.log("Error");
+		}
+
+		function renderTableData(tx, results) 
+		{
+			var len = results.rows.length;
+			var tableData="";
+			for (var i=0; i<len; i++)
+			{
+				console.log("Row = " + i + " ID = " + results.rows.item(i).ID + " TITLE =  " + results.rows.item(i).TITLE+" NOTE =  " + results.rows.item(i).NOTE);
+				var dateTime = new Date(results.rows.item(i).CTIME);
+				var str = String(dateTime);
+				var dateStr = str.split("GMT");
+				var data ="<div align='left' onclick='update(\""+results.rows.item(i).ID+"\");' id='"+results.rows.item(i).ID+"' style='margin-left:5%;overflow: hidden;height:10%;'><b>"+results.rows.item(i).TITLE+"</b><br><span style='font-size:12px'>"+results.rows.item(i).NOTE+"</span><br><span style='font-size:10px;color:#4268b1'>"+dateStr[0]+"</span></div><hr style='width:92%;margin-left:5%'>";
+				tableData += data;
+			}
+			document.getElementById("tableData").innerHTML = tableData;
+		}
+		
+		function addNote()
+		{
+			window.location = "addNote.html";
+		}
+		
+		function update(id)
+		{
+			window.location = "updateNote.html?ID="+id;
+		}
+		
+		function errorCB(err) 
+		{
+			alert("Error processing SQL..! Error Code : "+err.code);
+			window.location = "login.html";
+		}
+		
+		function logout()
+		{
+			navigator.app.exitApp();
+		}
+		
+		function settings()
+		{
+			window.location = "settings.html";
+		}
+		
+		function onLoad() 
+		{
+			document.addEventListener("deviceready", onDeviceReady, false);
+		}
+
+		function onDeviceReady() 
+		{
+			document.addEventListener("backbutton", onBackKeyDown, false);
+		}
+
+		function onBackKeyDown() 
+		{
+			if(confirm("Are you sure to Quit?"))
+			{
+				navigator.app.exitApp();
+			}
+		}
+		
+		//<img src="img/close.png" onclick="logout();" style="width:25px;height:25px;repeat:none;outline:none;">
+	</script>
+	<style type="text/css">
+		
+	</style>
+</head>
+
+<body style="background-color: #fff;">
+	<div class="container" style="background-color: #fff;">
+		<div align="center" class="login-header" style="position: fixed;top: 0;margin-top:0px;width: 100%;z-index:999;background-color:#4268b1;height:8%">
+			<div align="left" style="margin-left:5%;margin-top:2.5%;float:left;">
+				<img src="img/book.png" style="width:25px;height:25px;repeat:none;outline:none;">
+				<span style="font-size:18px; color:#f1f1f1"><b>All Notes</b></span>
+			</div>
+			<div align="right" style="margin-right:2%;margin-top:1%;float:right:">
+				<div></div>
+				<div class="w3-dropdown-hover">
+					<button class="w3-button"><img src="img/settings.png" style="width:25px;height:25px;repeat:none;outline:none;"></button>
+					<div class="w3-dropdown-content w3-bar-block w3-card-4">
+					  <a href="#" onclick="settings();" style="margin-bottom:-12px" class="w3-bar-item w3-button">Settings</a>
+					  <hr>
+					  <a href="#" style="margin-top:-12px" onclick="logout();" class="w3-bar-item w3-button">Quit</a>
+					</div>
+				</div>
+			</div>
+		</div>	
+		<br>
+		<div style="margin-top:40px;z-index:1;background-color: #fff;" id="tableData" align="left">
+			
+		</div>
+		<footer class="login-footer" style="position: fixed;bottom: 0;">
+			<div class="addBtn" align= "center" style="margin-right:15px;margin-bottom:15px;">
+				<img src="img/add.png" onclick="addNote();" style="float:right;width:48px;height:48px;repeat:none;outline:none;"/>
+			</div>
+		</footer>
+	</div>
+	<script type="text/javascript" src="cordova.js"></script>
+    <script>
+		loadMainScreen();
+		onLoad();
+	</script>
+</body>

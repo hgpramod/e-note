@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" type="text/css" href="css/settings.css" />
+	<script type="text/javascript"  src="js/phonegap-1.2.0.js"></script>
+    <title>Safe Lock</title>
+	<script type="text/javascript">
+	var lastId = 0;
+	function cancel()
+	{
+		window.open('displayNote.html','_self');
+	}
+	
+	function getData()
+	{
+		var db = window.openDatabase("ELOCK", "1.0", "elocker", 500000);
+		db.transaction(queryDB, errorCB);
+	}
+	
+	function queryDB(tx) 
+	{
+		tx.executeSql('SELECT * FROM USER', [], querySuccess, errorCB);
+	}
+
+	function querySuccess(tx, results) 
+	{
+		var len = results.rows.length;
+		if(len > 0)
+		{
+			var skiplogin = false;
+			var eraseData = false;
+			
+			if(results.rows.item(0).skiplogin == true || results.rows.item(0).skiplogin == "true")
+				skiplogin = true;
+			if(results.rows.item(0).earasedata == true || results.rows.item(0).earasedata == "true")
+				eraseData = true;
+				
+			document.getElementById("skipLogin").checked = skiplogin;
+			document.getElementById("eraseData").checked = eraseData;
+			toggleEraseData();
+		}
+	}
+	
+	function done()
+	{
+		window.open('displayNote.html','_self');
+	}
+	
+	function toggleEraseData()
+	{
+		var skipLogin = document.getElementById("skipLogin").checked;
+		if(skipLogin)
+		{
+			document.getElementById("eraseDataTd").style.opacity="0.5";
+			document.getElementById("eraseData").checked = false;
+			document.getElementById("eraseData").disabled = true;
+		}
+		else
+		{
+			document.getElementById("eraseDataTd").style.opacity="1";
+			document.getElementById("eraseData").disabled = false;
+		}
+	}
+	
+	function saveSettings()
+	{
+		var db = window.openDatabase("ELOCK", "1.0", "elocker", 500000);
+			db.transaction(updateSettings, errorCB);
+			
+	}
+	
+	function errorCB(err) 
+	{
+		alert("Error processing SQL..! Error Code : "+err.code);
+		window.open('login.html','_self');
+	}
+	
+	function updateSettings(tx)
+	{
+		var skipLogin = document.getElementById("skipLogin").checked;
+		var eraseData = document.getElementById("eraseData").checked;
+		var user = localStorage.getItem("username");
+		tx.executeSql('UPDATE USER SET skiplogin= "'+skipLogin+'",earasedata="'+eraseData+'" WHERE name = "'+user+'"');
+		window.open('displayNote.html','_self');
+	}
+		
+	function fetchAllDataFromDB(tx)
+	{
+		tx.executeSql('SELECT * FROM ENOTES ORDER BY ID DESC', [], renderResult, nodataError);
+	}
+	
+	function nodataError(err)
+	{
+		console.log("Error");
+	}
+
+	function renderResult(tx, results) 
+	{
+		var JSONArr = new Array(); 
+		var len = results.rows.length;
+		for (var i=0; i<len; i++)
+		{
+			console.log("Row = " + i + " ID = " + results.rows.item(i).ID + " TITLE =  " + results.rows.item(i).TITLE+" NOTE =  " + results.rows.item(i).NOTE);
+			var dataObj = {ID:results.rows.item(i).ID, TITLE:results.rows.item(i).TITLE,NOTE:results.rows.item(i).NOTE,CATEGORY:results.rows.item(i).CATEGORY,CTIME:results.rows.item(i).CTIME};
+			JSONArr.push(dataObj);
+		}
+		if(len > 0)
+		{
+			lastId = parseInt(results.rows.item(0).ID,10)+1;
+			var finalExpData = JSON.stringify(JSONArr);
+			document.getElementById("exportedJSON").value = finalExpData;
+			var copyText = document.getElementById("exportedJSON");
+			copyText.select();
+			document.execCommand("copy");
+		}
+	}
+	
+	function exportTxt()
+	{
+		//download('This feature will be available soon.', "test")
+		var db = window.openDatabase("ELOCK", "1.0", "elocker", 500000);
+		db.transaction(fetchAllDataFromDB, errorCB);	
+	}
+	
+	function download(data, filename) 
+	{
+		debugger;
+		alert('download');
+		var file = new Blob([data], {type: "text/plain;charset=utf-8"});
+		if (window.navigator.msSaveOrOpenBlob)
+		{// IE10+
+			alert('window.navigator.msSaveOrOpenBlob');
+			window.navigator.msSaveOrOpenBlob(file, filename);
+		}
+		else 
+		{ 
+			alert('else');
+			var a = document.createElement("a"),
+					url = URL.createObjectURL(file);
+			a.href = url;
+			a.download = filename;
+			document.body.appendChild(a);
+			alert('click');
+			a.click();
+			setTimeout(function() {
+				document.body.removeChild(a);
+				window.URL.revokeObjectURL(url);  
+			}, 0); 
+		}
+	}
+	
+	function importData()
+	{
+		var JSONData = document.getElementById("exportedJSON").value;
+		if(JSONData == null || JSONData == "")
+		{
+			document.getElementById("exportedJSON").focus();
+		}
+		else
+		{
+			debugger;
+			var dataObjs = JSON.parse(JSONData);
+			var dataStr = 'VALUES ';
+			var count = 0;
+			for (var i=0; i<dataObjs.length; i++)
+			{
+				if(null != dataObjs[i].TITLE)
+				{
+					if(i == 0)
+						dataStr = dataStr +'("'+lastId+'","'+dataObjs[i].TITLE+'", "'+dataObjs[i].NOTE+'", "'+dataObjs[i].CTIME+'","'+dataObjs[i].CATEGORY+'")';
+					else
+						dataStr = dataStr +',("'+lastId+'","'+dataObjs[i].TITLE+'", "'+dataObjs[i].NOTE+'", "'+dataObjs[i].CTIME+'","'+dataObjs[i].CATEGORY+'")';
+					lastId++;
+					count++;
+				}
+			}
+			if(count > 0)
+			{
+				var db = window.openDatabase("ELOCK", "1.0", "elocker", 500000);
+				db.transaction(function (tx) 
+				{
+					tx.executeSql('CREATE TABLE IF NOT EXISTS ENOTES (ID,TITLE,NOTE,CTIME,CATEGORY)');
+					tx.executeSql('INSERT INTO ENOTES (ID,TITLE,NOTE,CTIME,CATEGORY)'+dataStr);
+				});
+				saveSettings();
+			}
+		}
+	}
+	
+	function deleteData()
+	{
+		if(confirm("Delete all notes and passwords ..?"))
+		{
+			var db = window.openDatabase("ELOCK", "1.0", "elocker", 500000);
+			db.transaction(deleteKey, errorCB);
+		}
+	}
+	
+	function deleteKey(tx)
+	{
+		tx.executeSql('DELETE FROM ENOTES');
+		saveSettings();
+	}
+	
+	</script>
+</head>
+
+<body style="background-color: #fff;" onload="getData();">
+	<div height="100%">
+		<div align="center" class="login-header" style="position: fixed;top: 0;margin-top:0px;width: 100%;z-index:999;background-color: #fff;">
+			<div style="margin-top:10px" align="center">
+				<div style="float:left;" align= "center">
+					<img src="img/back.png" onclick="cancel();" style="float:right;width:30px;height:30px;repeat:none;outline:none;margin-left:10px">
+				</div>
+				<div style="float:right;" align= "center">
+					<img src="img/done.png" onclick="saveSettings();" style="float:right;width:30px;height:30px;repeat:none;outline:none;margin-right:15px">
+				</div>
+			</div>
+		</div>
+		<br>
+		<br>
+		<div align="left" style="margin-left:5%;margin-top:10%" width="100%">
+			<label class="container">Skip Login
+			  <input type="checkbox" id="skipLogin" onchange='toggleEraseData();'/>
+			  <span class="checkmark"></span>
+			</label>
+			<br>
+			<label class="container">
+			  <span id="eraseDataTd">Erase Data after 3 incorrect trials
+			  </span>
+			  <input type="checkbox" id="eraseData"/>
+			  <span class="checkmark"></span>
+			</label>
+			<br>
+			<br>
+			 <button class="btn btn-primary login-button" onclick="exportTxt()">Export To JSON</button>
+			 <br>
+			 <br>
+			 <input type="text" id="exportedJSON" style="width:75%;outline:none;border:none;border-bottom:1px solid grey"/>
+			 <br>
+			<br>
+			 <button class="btn btn-primary login-button" style="float:left;" onclick="deleteData()">Delete All</button>
+			 <button class="btn btn-primary login-button" style="float:right;margin-right:25%" onclick="importData()">Import Data</button>
+		</div>
+	</div>
+</body>
